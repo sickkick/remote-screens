@@ -244,6 +244,18 @@ class RenderTest {
         assertTrue(AlertRenderer.render(Alert("Washer done"), tablet, input()).docContext.videos.isEmpty())
     }
 
+    @Test
+    fun aPersonCardsMapTargetsItsBoxAndStillBitmap() {
+        val doc = CardRenderer.render("person.sam", null, tablet, input())
+
+        assertTrue(doc.docContext.pictures.any { it.name == "map.card" })
+        val map = doc.docContext.maps.single()
+        assertEquals(listOf("person.sam"), map.entityIds)
+        assertEquals(LiveMap.FIRST_COMPONENT_ID, map.componentId)
+        assertTrue(map.dark)
+        assertVideoTargetFound(doc, map.componentId)
+    }
+
     /** The player finds the target by its id once it has read the document, as it must to lay the video over it. */
     private fun assertVideoTargetFound(doc: RenderedDoc, componentId: Int) {
         val component = assertNotNull(parse(doc.bytes).getComponent(componentId), "component $componentId")

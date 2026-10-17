@@ -29,6 +29,8 @@ internal object CardChrome {
     const val HEADER_GAP_DP = 14f
     const val CARD_GAP_DP = 16f
     const val CAMERA_SPINNER_DP = 48f
+    /** Marker photo size sent for interactive map pins. */
+    const val MAP_MARKER_DP = 48f
     const val SECTION_TITLE_GAP_DP = 18f
     const val PANEL_PAD_DP = 20f
     const val WEATHER_ICON_ROW_DP = 28f

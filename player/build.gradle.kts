@@ -83,6 +83,10 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)
 
+    // Interactive map cards (osmdroid, same stack as RPI)
+    implementation(libs.osm.android)
+    implementation(libs.osm.compose)
+
     // Front-camera face wake
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)

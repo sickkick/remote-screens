@@ -1,8 +1,10 @@
 package tech.shaffersoftworks.remotescreens.server.player.session
 
 import tech.shaffersoftworks.remotescreens.server.data.homeassistant.EntityState
+import tech.shaffersoftworks.remotescreens.server.render.LiveMap
 import tech.shaffersoftworks.remotescreens.server.render.LiveVideo
 import tech.shaffersoftworks.remotescreens.server.render.Vars
+import tech.shaffersoftworks.remotescreens.shared.MapMarker
 import tech.shaffersoftworks.remotescreens.shared.PlayerMessage
 import tech.shaffersoftworks.remotescreens.shared.ServerMessage
 import tech.shaffersoftworks.remotescreens.shared.VarValue
@@ -11,8 +13,9 @@ import org.slf4j.LoggerFactory
 import java.util.Base64
 
 private const val MS_PER_SECOND = 1000L
+private const val MAP_CARD_PICTURE = "map.card"
 
-/** Camera video streams and picture bitmaps for a [SessionHost]. */
+/** Camera video streams, interactive maps, and picture bitmaps for a [SessionHost]. */
 internal class SessionMedia(
     private val host: SessionHost,
 ) {
@@ -37,6 +40,37 @@ internal class SessionMedia(
                 return@launch
             }
             host.send(ServerMessage.Video(shown.slot, shown.revision, video.componentId, path, video.crop))
+        }
+    }
+
+    /** Tells a map-capable player the pins and tile URL for [map]; no-op for older players (they get the still). */
+    fun sendMap(shown: ShownDocument, map: LiveMap, states: Map<String, EntityState>) {
+        if (!host.supportsMap) return
+        context.scope.launch {
+            if (shownDocuments[shown.slot] !== shown) return@launch
+            val markers = map.entityIds.mapNotNull { entityId ->
+                val entityState = states[entityId] ?: return@mapNotNull null
+                val latitude = entityState.number("latitude") ?: return@mapNotNull null
+                val longitude = entityState.number("longitude") ?: return@mapNotNull null
+                val pictureName = "${Vars.MAP_PIC_PREFIX}$entityId"
+                    .takeIf { name -> shown.renderedDoc.docContext.pictures.any { it.name == name } }
+                MapMarker(
+                    latitude = latitude,
+                    longitude = longitude,
+                    label = entityState.name,
+                    picture = pictureName,
+                )
+            }
+            host.send(
+                ServerMessage.LiveMap(
+                    slot = shown.slot,
+                    rev = shown.revision,
+                    componentId = map.componentId,
+                    tileUrl = context.mapTileUrl,
+                    dark = map.dark,
+                    markers = markers,
+                ),
+            )
         }
     }
 
@@ -74,7 +108,10 @@ internal class SessionMedia(
 
     fun sendPictures(shown: ShownDocument, states: Map<String, EntityState>, isForced: Boolean) {
         val nowMs = System.currentTimeMillis()
-        for (picture in shown.renderedDoc.docContext.pictures) {
+        // Interactive map players draw OSM themselves; skip the server-drawn map still.
+        val pictures = shown.renderedDoc.docContext.pictures
+            .filterNot { host.supportsMap && it.name == MAP_CARD_PICTURE }
+        for (picture in pictures) {
             val sourceKey = context.pictureRepository.sourceKey(picture, states)
             val lastSentMs = shown.pictureSentAtMs[picture.name] ?: 0
             val isDue = picture.refreshSeconds > 0 && nowMs - lastSentMs >= picture.refreshSeconds * MS_PER_SECOND

@@ -1,6 +1,7 @@
 package tech.shaffersoftworks.remotescreens.player.ui.screens.player.remote
 
 import android.graphics.Bitmap
+import tech.shaffersoftworks.remotescreens.shared.MapMarker
 import tech.shaffersoftworks.remotescreens.shared.ServerMessage
 import tech.shaffersoftworks.remotescreens.shared.Slot
 import tech.shaffersoftworks.remotescreens.shared.VarValue
@@ -29,6 +30,18 @@ data class SlotVideo(
 )
 
 /**
+ * An interactive map over the component with [componentId] in document [revision] of a slot. [tileUrl] has
+ * `{z}`, `{x}` and `{y}`; [markers] are people (or trackers) to pin.
+ */
+data class SlotMap(
+    val revision: Int,
+    val componentId: Int,
+    val tileUrl: String,
+    val dark: Boolean,
+    val markers: List<MapMarker>,
+)
+
+/**
  * Everything the Remote Compose players show: the pages of the screen, a card over them, an alert over both.
  * Values go to every shown document; each document takes the ones it names.
  */
@@ -39,6 +52,8 @@ data class RemoteScreenState(
     val bitmaps: Map<String, Bitmap> = emptyMap(),
     /** Live video the add-on started for a shown document; it goes with the document. */
     val videos: Map<Slot, SlotVideo> = emptyMap(),
+    /** Interactive map the add-on started for a shown document; it goes with the document. */
+    val maps: Map<Slot, SlotMap> = emptyMap(),
     /** Named integers the player sets itself (free-form tabs), kept across document rebuilds. */
     val localInts: Map<String, Int> = emptyMap(),
     val page: Int = 0,
@@ -70,6 +85,15 @@ data class RemoteScreenState(
                 ?.let { video -> slot to video }
         }
 
+    /** The interactive map to show: only the topmost overlay's, matching its document revision. */
+    val playingMap: Pair<Slot, SlotMap>?
+        get() {
+            val slot = topOverlay ?: return null
+            return maps[slot]
+                ?.takeIf { map -> map.revision == documents[slot]?.revision }
+                ?.let { map -> slot to map }
+        }
+
     /** The page to show after a new main document: the same one if it still exists, otherwise home. */
     val pageAfterNewDocument: Int get() = if (page < pageCount) page else homePage
 
@@ -84,6 +108,7 @@ data class RemoteScreenState(
             documents = documents + (message.slot to document),
             values = values + message.vars.associateBy(VarValue::name),
             videos = videos - message.slot,
+            maps = maps - message.slot,
         )
         if (message.slot != Slot.MAIN) return updated
         val newPageCount = message.pageCount.coerceAtLeast(1)
@@ -123,15 +148,29 @@ data class RemoteScreenState(
     fun withoutVideo(slot: Slot, video: SlotVideo): RemoteScreenState =
         if (videos[slot] == video) copy(videos = videos - slot) else this
 
+    /** A map for a document that is no longer shown is dropped. */
+    fun withMap(slot: Slot, map: SlotMap): RemoteScreenState =
+        if (documents[slot]?.revision == map.revision) copy(maps = maps + (slot to map)) else this
+
     fun withPage(index: Int): RemoteScreenState = copy(page = index.coerceIn(0, pageCount - 1))
 
     fun withLocalInt(name: String, value: Int): RemoteScreenState = copy(localInts = localInts + (name to value))
 
     /** The main document cannot be closed, only replaced or cleared. */
     fun closed(slot: Slot): RemoteScreenState =
-        if (slot == Slot.MAIN) this else copy(documents = documents - slot, videos = videos - slot)
+        if (slot == Slot.MAIN) {
+            this
+        } else {
+            copy(documents = documents - slot, videos = videos - slot, maps = maps - slot)
+        }
 
     /** Hides every document and forgets the values, as when the screen must be paired again. */
     fun cleared(): RemoteScreenState =
-        copy(documents = emptyMap(), values = emptyMap(), videos = emptyMap(), localInts = emptyMap())
+        copy(
+            documents = emptyMap(),
+            values = emptyMap(),
+            videos = emptyMap(),
+            maps = emptyMap(),
+            localInts = emptyMap(),
+        )
 }

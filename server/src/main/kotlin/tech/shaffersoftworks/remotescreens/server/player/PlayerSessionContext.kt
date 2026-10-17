@@ -1,5 +1,6 @@
 package tech.shaffersoftworks.remotescreens.server.player
 
+import tech.shaffersoftworks.remotescreens.server.config.ServerConfig
 import tech.shaffersoftworks.remotescreens.server.data.apk.PlayerApkRepository
 import tech.shaffersoftworks.remotescreens.server.data.homeassistant.HomeAssistant
 import tech.shaffersoftworks.remotescreens.server.data.layout.LayoutRepository
@@ -25,4 +26,6 @@ class PlayerSessionContext(
     val actionRouter: ActionRouter,
     val screenClock: ScreenClock,
     val scope: CoroutineScope,
+    /** OpenStreetMap-style tile URL with `{z}`, `{x}` and `{y}`, for interactive map cards. */
+    val mapTileUrl: String = ServerConfig.OPENSTREETMAP_TILE_URL,
 )

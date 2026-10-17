@@ -1,0 +1,43 @@
+---
+description: Camera card dialog — RC spinner then live HLS; still only as stream-failure fallback; alerts/grid stay snapshot (PR #40, merged Oct 2026)
+globs: server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/CardRenderer.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Widgets.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Vars.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/DocContext.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/player/PlayerSession.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/service/CameraStreamService.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/remote/LiveVideoView.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/remote/RemoteDocumentView.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/remote/RemoteScreenState.kt,shared/src/main/kotlin/tech/shaffersoftworks/remotescreens/shared/Protocol.kt,server/src/test/kotlin/tech/shaffersoftworks/remotescreens/server/render/RenderTest.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Alerts.kt
+alwaysApply: false
+---
+
+# Camera dialog: spinner then live video (PR #40, merged Oct 2026)
+
+## What landed
+
+- **Camera card** (`CardRenderer.cameraCard`): no still as the loading UI. Dark `Role.TRACK` box with `componentId(liveVideo)` + centered `DocContext.spinner` (`Widgets.kt`, arc rotated by `continuousSeconds()` — same clock as analog seconds).
+- **Live overlay:** `LiveVideoView` stays `alpha = 0` until `onRenderedFirstFrame`, then opaque black + HLS. Spinner shows through while buffering. Touches still fall through to the document.
+- **Still fallback only when stream fails:** PictureSlot `cam.card.$entityId` still loads; Image visibility `e.<id>.cam_still` starts **GONE**, spinner `e.<id>.cam_waiting` starts **VISIBLE**. `PlayerSession.showCameraStillFallback` flips those when `!supportsVideo`, `hlsPath` is null, or video restarts are exhausted. Alerts never declare those vars → no-op.
+- **Unchanged:** grid camera tiles, free-form `image` cameras (snapshots only), alert cameras (still under video).
+
+## Wiring
+
+```
+tap card → openCard → warmCameraStream + CardRenderer
+  → show OVERLAY → sendPictures + sendVideo
+  → CameraStreamService HLS → ServerMessage.Video
+  → LiveVideoView over componentId bounds
+```
+
+- Vars: `Vars.KEY_CAM_WAITING` / `Vars.KEY_CAM_STILL` (`cam_waiting` / `cam_still` on the wire).
+- Spinner helper: `DocContext.spinner(sizeDp, color, visible?)` — reusable; **no** free-form/editor `spinner` node yet.
+
+## Gotchas
+
+- Demo / non-HLS cameras: card shows spinner then falls back to still (not endless spinner).
+- Do not put a native `ProgressBar` on `LiveVideoView` for the card path — loading is RC document UI.
+- Free-form cannot DIY a live-video modal today; live video is card + alert only.
+- **Cursor trailer:** commits may get `Co-authored-by: Cursor`; strip with `git commit-tree` + `--force-with-lease` on the feature branch only (user must ask). Prefer merge from `main` over rebase on shared PR branches.
+
+## Verify
+
+`./gradlew :server:test --tests '...RenderTest' :server:detekt` — especially `aCameraCardsVideoPlaysOverItsSpinnerFittedLikeIt` (pictures present, waiting/still declared, video `crop = false`).
+
+## Follow-ups / out of scope
+
+- Free-form / catalogue `spinner` leaf for the editor.
+- Alert path: still keep snapshot-under-video (not spinner-first).
+- Live video on grid tiles or free-form images.

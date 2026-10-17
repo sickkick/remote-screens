@@ -48,6 +48,8 @@ class DocContext(
     val pictures = mutableListOf<PictureSlot>()
     /** Cameras whose live video plays over one of the document's images, for players that can play it. */
     val videos = mutableListOf<LiveVideo>()
+    /** Maps whose interactive OSM view plays over one of the document's boxes, for players that can show it. */
+    val maps = mutableListOf<LiveMap>()
     /** Action metadata to the action and the entity it changes. */
     val predicted = LinkedHashMap<String, Pair<ActionRef, String>>()
     /** What of an entity is drawn into the document itself (an icon, a list of modes), and what it was. */
@@ -179,4 +181,19 @@ data class LiveVideo(val entityId: String, val componentId: Int, val crop: Boole
         /** Far above the ids the player gives components itself, so the video target is the only one with it. */
         const val FIRST_COMPONENT_ID = 0x5C_0000
     }
+}
+
+/** An interactive map of [entityIds] over the component with [componentId]; [dark] matches the theme. */
+data class LiveMap(val entityIds: List<String>, val componentId: Int, val dark: Boolean) {
+    companion object {
+        /** Next to [LiveVideo.FIRST_COMPONENT_ID], so map and video targets never share an id. */
+        const val FIRST_COMPONENT_ID = 0x5D_0000
+    }
+}
+
+/** The component id to give the box an interactive map of [entityIds] plays over, with `Modifier.componentId`. */
+fun DocContext.liveMap(entityIds: List<String>): Int {
+    val componentId = LiveMap.FIRST_COMPONENT_ID + maps.size
+    maps += LiveMap(entityIds, componentId, dark = palette.dark)
+    return componentId
 }

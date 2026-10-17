@@ -20,6 +20,7 @@ import tech.shaffersoftworks.remotescreens.player.data.kiosk.KioskState
 import tech.shaffersoftworks.remotescreens.player.data.preferences.PlayerPreferencesRepository
 import tech.shaffersoftworks.remotescreens.player.data.update.UpdateRepository
 import tech.shaffersoftworks.remotescreens.player.ui.screens.player.remote.RemoteScreenState
+import tech.shaffersoftworks.remotescreens.player.ui.screens.player.remote.SlotMap
 import tech.shaffersoftworks.remotescreens.player.ui.screens.player.remote.SlotVideo
 import tech.shaffersoftworks.remotescreens.player.utils.decodeBase64OrNull
 import tech.shaffersoftworks.remotescreens.shared.isNightAt
@@ -56,7 +57,16 @@ private const val PAIRING_CODE_GROUP_SIZE = 3
 /** After this many failed reconnects, look for the add-on over mDNS again (stale saved IP). */
 private const val REDISCOVER_AFTER_FAILURES = 5
 private val PLAYER_CAPABILITIES =
-    listOf("predictions", "bitmaps", "alerts", "cards", "settings", "deflate", Protocol.CAPABILITY_VIDEO)
+    listOf(
+        "predictions",
+        "bitmaps",
+        "alerts",
+        "cards",
+        "settings",
+        "deflate",
+        Protocol.CAPABILITY_VIDEO,
+        Protocol.CAPABILITY_MAP,
+    )
 
 /**
  * Runs a wall screen: finds and talks to the add-on, keeps the documents it sends, and does what a wall screen does
@@ -295,6 +305,7 @@ class PlayerViewModel @Inject constructor(
             is ServerMessage.UpdateAvailable -> onUpdateAvailable(message)
             is ServerMessage.Toast -> _events.send(PlayerEvent.ShowMessage(message.text))
             is ServerMessage.Video -> onVideo(message)
+            is ServerMessage.LiveMap -> onMap(message)
             ServerMessage.Pong -> Unit
         }
     }
@@ -357,6 +368,17 @@ class PlayerViewModel @Inject constructor(
         val token = preferencesRepository.token.first() ?: return
         val video = SlotVideo(message.rev, message.componentId, "http://$server${message.path}", token, message.crop)
         updateRemoteScreen { it.withVideo(message.slot, video) }
+    }
+
+    private fun onMap(message: ServerMessage.LiveMap) {
+        val map = SlotMap(
+            revision = message.rev,
+            componentId = message.componentId,
+            tileUrl = message.tileUrl,
+            dark = message.dark,
+            markers = message.markers,
+        )
+        updateRemoteScreen { it.withMap(message.slot, map) }
     }
 
     /** The add-on starts the camera's stream again, as Home Assistant ends one nobody watched for a while. */

@@ -74,6 +74,7 @@ class ServerDependencies(
             actionRouter = ActionRouter(homeAssistant) { languageRepository.current() },
             screenClock = ScreenClock(homeAssistant, languageRepository),
             scope = scope,
+            mapTileUrl = config.mapTileUrl,
         ),
     )
 

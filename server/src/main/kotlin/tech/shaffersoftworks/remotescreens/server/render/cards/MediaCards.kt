@@ -1,6 +1,6 @@
 @file:Suppress("RestrictedApi")
 
-package tech.shaffersoftworks.remotescreens.server.render
+package tech.shaffersoftworks.remotescreens.server.render.cards
 
 import tech.shaffersoftworks.remotescreens.server.data.renderdata.PictureSlot
 import androidx.compose.remote.creation.dsl.Modifier
@@ -18,6 +18,19 @@ import androidx.compose.remote.creation.dsl.size
 import androidx.compose.remote.creation.dsl.visibility
 import androidx.compose.remote.creation.dsl.width
 import tech.shaffersoftworks.remotescreens.server.data.homeassistant.EntityState
+import tech.shaffersoftworks.remotescreens.server.render.DocContext
+import tech.shaffersoftworks.remotescreens.server.render.Role
+import tech.shaffersoftworks.remotescreens.server.render.Type
+import tech.shaffersoftworks.remotescreens.server.render.Vars
+import tech.shaffersoftworks.remotescreens.server.render.Weight
+import tech.shaffersoftworks.remotescreens.server.render.gap
+import tech.shaffersoftworks.remotescreens.server.render.icon
+import tech.shaffersoftworks.remotescreens.server.render.key
+import tech.shaffersoftworks.remotescreens.server.render.label
+import tech.shaffersoftworks.remotescreens.server.render.liveMap
+import tech.shaffersoftworks.remotescreens.server.render.rounded
+import tech.shaffersoftworks.remotescreens.server.render.spinner
+import tech.shaffersoftworks.remotescreens.server.render.tap
 import tech.shaffersoftworks.remotescreens.shared.VarValue
 
 internal fun DocContext.mediaCard(entityId: String, entityState: EntityState?, w: Float) {
@@ -43,13 +56,15 @@ internal fun DocContext.mediaCard(entityId: String, entityState: EntityState?, w
         doc.gap(CardChrome.HEADER_GAP_DP)
         Row(horizontal = RcRowHorizontalPositioning.Center, vertical = RcVerticalPositioning.Center) {
             doc.key(ref(entityId, "previous"), icon = "skip-previous", heightDp = CardChrome.MEDIA_CTRL_DP, widthDp = CardChrome.MEDIA_CTRL_DP, round = true)
-            Spacer(Modifier.width(doc.units.px(CardChrome.SECTION_TITLE_GAP_DP)))
-            Box(doc.tap(Modifier.size(doc.units.px(CardChrome.PLAY_KEY_DP), doc.units.px(CardChrome.PLAY_KEY_DP)).clip(doc.rounded((CardChrome.PLAY_KEY_DP) / 2f)).background(doc.role(Role.KEY_ON)), ref(entityId, "play_pause")),
+            Spacer(width(doc.units.px(CardChrome.SECTION_TITLE_GAP_DP)))
+            Box(doc.tap(
+                size(doc.units.px(CardChrome.PLAY_KEY_DP), doc.units.px(CardChrome.PLAY_KEY_DP)).clip(doc.rounded((CardChrome.PLAY_KEY_DP) / 2f)).background(doc.role(
+                    Role.KEY_ON)), ref(entityId, "play_pause")),
                 horizontal = RcHorizontalPositioning.Center, vertical = RcVerticalPositioning.Center) {
                 doc.icon("pause", CardChrome.CLOSE_KEY_DP, doc.role(Role.KEY_ON_INK), doc.int(Vars.entity(entityId, "playing")))
                 doc.icon("play", CardChrome.CLOSE_KEY_DP, doc.role(Role.KEY_ON_INK), doc.int(Vars.entity(entityId, "notplaying")))
             }
-            Spacer(Modifier.width(doc.units.px(CardChrome.SECTION_TITLE_GAP_DP)))
+            Spacer(width(doc.units.px(CardChrome.SECTION_TITLE_GAP_DP)))
             doc.key(ref(entityId, "next"), icon = "skip-next", heightDp = CardChrome.MEDIA_CTRL_DP, widthDp = CardChrome.MEDIA_CTRL_DP, round = true)
         }
     }
@@ -96,9 +111,40 @@ internal fun DocContext.cameraCard(entityId: String, w: Float, h: Float) {
 internal fun DocContext.mapCard(entityId: String, w: Float, h: Float) {
     val pw = units.px(w).toInt()
     val ph = units.px(h).toInt()
-    val who = if (entityId.startsWith("person.") || entityId.startsWith("device_tracker.")) listOf(entityId) else states.keys.filter { it.startsWith("person.") }
-    for (p in who) structural(p) { s -> "${s?.number("latitude")},${s?.number("longitude")}" }
+    val who = if (entityId.startsWith("person.") || entityId.startsWith("device_tracker.")) {
+        listOf(entityId)
+    } else {
+        states.keys.filter { it.startsWith("person.") }
+    }
+    for (personId in who) {
+        structural(personId) { state -> "${state?.number("latitude")},${state?.number("longitude")}" }
+        val picturePath = states[personId]?.attr("entity_picture")
+        if (!picturePath.isNullOrBlank()) {
+            val markerPx = units.px(CardChrome.MAP_MARKER_DP).toInt().coerceAtLeast(1)
+            picture(
+                PictureSlot(
+                    "${Vars.MAP_PIC_PREFIX}$personId",
+                    "attr:$personId:entity_picture",
+                    markerPx,
+                    markerPx,
+                    0,
+                ),
+            )
+        }
+    }
     picture(PictureSlot("map.card", "map:${mapStyle()}:${who.joinToString(",")}", pw, ph, 0))
-    scope.Image(image("map.card", pw, ph), Modifier.size(units.px(w), units.px(h)).clip(rounded(CardChrome.CARD_GAP_DP)), contentScale = RcContentScale.Crop)
+    val mapComponent = liveMap(who)
+    val frame = Modifier.size(units.px(w), units.px(h))
+        .clip(rounded(CardChrome.CARD_GAP_DP))
+        .background(role(Role.TRACK))
+        .componentId(mapComponent)
+    scope.Box(frame) {
+        val doc = this@mapCard
+        Image(
+            doc.image("map.card", pw, ph),
+            Modifier.fillMaxSize(),
+            contentScale = RcContentScale.Crop,
+        )
+    }
     label(i18n.t("ui.map_credit"), Type.CAPTION, role(Role.INK_SOFT))
 }

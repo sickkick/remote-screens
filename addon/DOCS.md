@@ -127,6 +127,10 @@ Tiles that are not an entity: clock, bedside clock, page navigation, history gra
 favourite (a playlist on a player). Entities whose domain has no dedicated tile still appear in the library as a
 generic on/off tile (`homeassistant.toggle`).
 
+The **map card** (person, device tracker, or the map tile's detail) is an interactive OpenStreetMap on current
+players: pinch to zoom and drag to pan. Older players still get a still image drawn by the add-on. Grid map tiles
+stay as still images.
+
 Besides the grid, a page can be **free-form**: a tree of layout and control components (columns, dials, tabs,
 markdown, QR codes, and the rest in the component palette). The demo screen includes a Compose page that shows
 several of them.
@@ -204,4 +208,4 @@ token is stored as a hash only. To remove a tablet, use **Forget** in the editor
 
 | Option | What |
 | ------ | ---- |
-| `map_tiles` | Where map tiles come from, as a URL with `{z}`, `{x}` and `{y}`. Empty is OpenStreetMap, whose tile servers ask for light use: the add-on caches tiles and only fetches what a map shows. With many tablets, or for another map style, use a tile provider you have a key for. |
+| `map_tiles` | Where map tiles come from, as a URL with `{z}`, `{x}` and `{y}`. Empty is OpenStreetMap, whose tile servers ask for light use: the add-on caches tiles for still map images on the grid (and on older players). Interactive map cards on current players fetch tiles on the tablet using the same URL. With many tablets, or for another map style, use a tile provider you have a key for. |

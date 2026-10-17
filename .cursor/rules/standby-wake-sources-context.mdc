@@ -1,0 +1,40 @@
+---
+description: Standby wake sources — HA remote_screens.wake, on-device proximity, front-camera face (ML Kit); independent toggles, blackout vs panel-off, CI lint (PR #44, merged Oct 2026)
+globs: player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/data/device/FaceWakeMonitor.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/data/device/ProximityWakeMonitor.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/data/device/ScreenPowerRepository.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/PlayerViewModel.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/PlayerScreen.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/PlayerUiModels.kt,player/src/main/kotlin/tech/shaffersoftworks/remotescreens/player/ui/views/ScreenSettingsDialog.kt,shared/src/main/kotlin/tech/shaffersoftworks/remotescreens/shared/Layout.kt,shared/src/test/kotlin/tech/shaffersoftworks/remotescreens/shared/WakeSettingsTest.kt,player/src/test/kotlin/tech/shaffersoftworks/remotescreens/player/ui/screens/player/PlayerViewModelTest.kt,editor/src/components/ScreenPanel.vue,editor/src/model/types.ts,custom_components/remote_screens/switch.py,custom_components/remote_screens/strings.json,custom_components/remote_screens/translations/en.json,custom_components/remote_screens/icons.json,addon/DOCS.md,gradle/libs.versions.toml,player/build.gradle.kts,player/src/main/AndroidManifest.xml
+alwaysApply: false
+---
+
+# Standby wake sources (PR #44, merged Oct 2026)
+
+## What landed
+
+- Opt-in screen settings (default **off**): `wakeOnProximity`, `wakeOnFace` on `ScreenSettings` in `Layout.kt`.
+- Surfaces: editor Standby checkboxes (`ScreenPanel.vue`), HA switches `wake_on_proximity` / `wake_on_face`, player camera-permission offer in settings when face is on.
+- **HA wake** (unchanged protocol): `remote_screens.wake` / event `remote_screens_wake` → `PlayerHub.wake` → `ServerMessage.Wake` → `onUserInteraction()`. Primary path for room-scale PIR / mmWave / ultrasonic / occupancy (no standard Android ultrasonic API).
+- **Proximity:** `ProximityWakeMonitor` — `Sensor.TYPE_PROXIMITY` while asleep, debounce near; soft no-op if missing. No runtime permission. Phone-style range is often only a few cm.
+- **Face:** `FaceWakeMonitor` — CameraX front `ImageAnalysis` + ML Kit Face Detection (`PERFORMANCE_MODE_FAST`, no landmarks/contours, ~320×240, `KEEP_ONLY_LATEST`, ~2 fps). `isUsable()` = camera permission + `FEATURE_CAMERA_FRONT` + not `ActivityManager.isLowRamDevice()`. Soft no-op otherwise. Manifest: `CAMERA`, front camera `required=false`.
+- **Both independent:** if both settings are on and usable, **both** monitors run. Face is not blocked by proximity.
+- **Screen power:** when face wake is actively usable, skip `ScreenPowerRepository.turnScreenOff()` / `lockNow()` (camera often dies with panel off) — software blackout instead. Proximity-only may keep `standbyScreenOff`. Docs in `addon/DOCS.md`.
+
+## Wiring
+
+- `PlayerViewModel.updateWakeMonitors()` on sleep/wake/settings/permission result; stop both on wake / `onCleared`.
+- `PlayerScreen` requests `CAMERA` via `PlayerEvent.RequestCameraPermission`.
+- Dependencies: CameraX + `mlkit-face-detection` in `libs.versions.toml` / `player/build.gradle.kts`.
+
+## Gotchas
+
+- **Android lint:** `ImageProxy.image` is `@ExperimentalGetImage`. Kotlin `@OptIn` alone fails `:player:lintDebug`. Use `@SuppressLint("UnsafeOptInUsageError")` on `analyze` (class-level marker leaks into `PlayerViewModel`).
+- **Low-RAM / no front camera:** leave setting stored; do not start monitor; optional one-shot note in tablet settings (`face_wake_low_ram` / `face_wake_no_camera`).
+- **Privacy / power:** privacy indicator while camera runs in standby; keep tablet plugged in.
+- **ProximityWakeMonitor:** no `CoroutineScope` needed (sync SensorManager). Face may later use a scoped start/stop job; not required for proximity.
+- **Cursor trailer:** commits can get `Co-authored-by: Cursor`; strip with `git commit-tree` + `--force-with-lease` on the feature branch only (user must approve rewrite). Prefer merge from `main` over rebase on shared PR branches.
+
+## Verify
+
+`./gradlew :player:lintDebug :player:detekt :player:testDebugUnitTest --tests '...PlayerViewModelTest' :shared:test --tests '...WakeSettingsTest'`
+
+## Follow-ups / out of scope (still)
+
+- Vendor ultrasonic / mmWave Android APIs; streaming tablet camera to HA; identifying which person; changing default standby (sources stay opt-in).
+- Optional FaceWakeMonitor coroutine refactor for cancelable CameraX provider await.

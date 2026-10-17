@@ -1,0 +1,35 @@
+---
+description: Free-form thermostat leaf + full climate tile — HA Heat/Cool dual dial, mode/fan bar, editor mockups, demo entity, CI gotchas (PR #53, merged Oct 2026)
+globs: server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/ThermostatPanel.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/FreeFormBlocks.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/data/homeassistant/demo/DemoHome.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/data/homeassistant/demo/DemoLayout.kt,server/src/test/kotlin/tech/shaffersoftworks/remotescreens/server/render/FreeFormTest.kt,server/src/test/kotlin/tech/shaffersoftworks/remotescreens/server/render/RenderTest.kt,editor/src/components/NodeView.vue,editor/src/components/GridMockup.vue,editor/src/model/nodes.ts,shared/src/main/kotlin/tech/shaffersoftworks/remotescreens/shared/Layout.kt,server/src/main/resources/translations/**
+alwaysApply: false
+---
+
+# Thermostat component (PR #53, merged Oct 2026)
+
+## What landed
+
+- Free-form node type `thermostat` → `thermostatNode` in `FreeFormBlocks.kt` → same drawing as full climate tile via `thermostatPanel` in `ThermostatPanel.kt`.
+- Layout: teal bar + "ADJUST THE TEMPERATURE"; CURRENT TEMP / humidity flanking the dial; HA-style mode bar (Heat/Cool · Heat · Cool · Off) + Fan mode cycle button.
+- Remote Compose cannot drag knobs → +/− keys. Single setpoint: − left, + right. Dual (Heat/Cool range): stacked +/− left for `temperature_low`, right for `temperature_high`.
+- Dual dial: orange heat arc (bottom → low), white gap (`DUAL_ARC_GAP_DEG`), blue cool arc → high; knobs at both ends; center shows action + orange `low` / blue `high` labels (`°` or `°F` from HA unit).
+- Dual detection (`isDual`): `supports(CLIMATE_TEMP_RANGE_FLAG)` (bit 2), state `heat_cool`, or both `target_temp_low`/`high` present. Structural key includes `isDual` so the document rebuilds when range appears.
+- Catalogue already had `temperature_low` / `temperature_high` actions + predictions; panel predicts those in dual mode.
+- Demo: `climate.living_room` is `heat_cool` with low/high, humidity, fan modes, `supported_features` 59. Free-form + full Thermostat page bind it.
+- Editor: `NodeView` + `GridMockup` dual-dial mockups; palette entry in `nodes.ts`. Merge with main kept thermostat **and** dial/countdown/qr/… blocks from #50.
+
+## Gotchas
+
+- **i18n:** every `ui.*` key in `en.json` must exist in de/nl/fr/es/it/pt/pl (`I18nTest`). `ui.fan_mode` was the miss that failed CI.
+- **ThemesTest:** no bare `0xAARRGGBB` (8 hex digits) outside `Themes.kt`. Use `0xFFFFFF` (6 digits) or `0xFF000000.toInt()`.
+- **Cursor trailer:** commits can get `Co-authored-by: Cursor`; strip with `git commit-tree` + `--force-with-lease` on the feature branch only (user must ask / approve rewrite).
+- Prefer merge from `main` over rebase on shared PR branches (`avoid-force-push` rule).
+
+## Verify
+
+`./gradlew :server:test :server:detekt` — especially `RenderTest.aFullClimateTileIsTheRpiThermostatPage`, `FreeFormTest.aThermostatComponentStepsAndSetsModesThroughTheRouter`, `I18nTest`, `ThemesTest.onlyThemesHoldsHexColours`.
+
+## Not in this PR / follow-ups
+
+- Reverted earlier attempt to make SlotDocument predictions a mutable map — leave predictions as-is.
+- Bedroom `climate.bedroom` is also dual but unused by the Thermostat page; living_room is the demo target.
+- No continuous dial drag until Remote Compose supports it.

@@ -1,0 +1,47 @@
+---
+description: Live UI must match concept mockups (nav pill/top accent, underline tabs, segmented bars, card chrome). Source of truth for player + editor preview.
+globs: server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/ScreenRenderer.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/FreeForm.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/FreeFormBlocks.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/CardRenderer.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Controls.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Tiles.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Vars.kt,server/src/main/kotlin/tech/shaffersoftworks/remotescreens/server/render/Themes.kt,editor/src/components/GridMockup.vue,editor/src/components/AttributesPanel.vue,editor/src/model/nodes.ts,docs/screenshots/mockup-*.jpg,server/src/test/kotlin/tech/shaffersoftworks/remotescreens/server/render/FreeFormTest.kt,server/src/test/kotlin/tech/shaffersoftworks/remotescreens/server/render/RenderTest.kt
+alwaysApply: false
+---
+
+# Mockup UI match (Oct 2026)
+
+Concept screenshots in `docs/screenshots/` are the visual target (not live captures). Keep player renderers and `GridMockup.vue` aligned with them.
+
+## Screenshots
+
+| File | Focus |
+| --- | --- |
+| `mockup-domain-tiles.jpg` | Teal header lines; teal segmented level bars; nav = full teal top line + active teal pill |
+| `mockup-detail-cards.jpg` | Centered title, circular close left; white segmented bars; connected choice rows; pill Reset |
+| `mockup-freeform-compose.jpg` | Dial / countdown / QR on white plate; `Note \| Light` underline tabs; nav active = top teal bar |
+
+## Implemented patterns
+
+- **Nav (`ScreenRenderer.navButton` + `GridMockup`):** Hybrid of both mockups — continuous `NAV_LINE` + per-item top bar + teal pill when on. Idle icon/label = `Role.INK`; active = `KEY_ON_INK` on pill. CSS: `.nav .button .top-bar` / `.pill`.
+- **Tabs (`FreeForm.tabsNode`):** Pipe-separated labels; teal underline under active; selection in `n.<id>.tab` via `StateLayout`. Helpers `tabStrip` / `tabLabel` call layout APIs through `scope.*`.
+- **Segmented bars (`Controls.segmentedLevelBar`):** Detail cards (`CardRenderer.bar`) → fill `Role.INK`; domain tiles (`Tiles.entityTileLevelBar`) → fill `Role.ACCENT`, track `Role.TRACK`.
+- **Choices:** Short lists (2–`FLOW_KEYS_SEGMENT_MAX`) → `choiceRow` / `flowKeys`; bind via `bindChoices`.
+- **Tile header line (`Vars` `KEY_LINE`):** Off = `Role.ACCENT_SOFT`, on = pastel accent. Editor `.tile .line` uses `--rc-accent-soft`.
+- **QR:** White rounded plate behind the code (`FreeForm.qrNode`).
+- **Editor bindables:** Dial / countdown / QR + free-form blocks (timerkeys, todolist, events, mediabar, forecast, presence, led) in `AttributesPanel` / `nodes.ts`.
+
+## Themes / CSS
+
+Roles `accent_soft` and `key_on_ink` live in `Themes.kt` → `--rc-accent-soft` / `--rc-key-on-ink` via `editor/src/model/palette.ts` `themeVars`.
+
+## Verify
+
+```bash
+./gradlew :server:detekt :server:test \
+  --tests 'tech.shaffersoftworks.remotescreens.server.render.FreeFormTest' \
+  --tests 'tech.shaffersoftworks.remotescreens.server.render.RenderTest'
+```
+
+`RenderTest` tile-line assertions expect `ACCENT_SOFT` when off, pastel when on.
+
+## Gotchas
+
+- Detekt: keep `tabsNode` ≤60 lines (extract helpers); break long `navButton` label lines.
+- Compose DSL (`StateLayout` / `Row` / `Spacer`) must run on `scope` / inside an `RcScope` lambda — not bare on `DocContext`.
+- Domain vs free-form nav mockups disagree slightly; prefer hybrid (pill + top accent), don’t drop either cue without an explicit design change.

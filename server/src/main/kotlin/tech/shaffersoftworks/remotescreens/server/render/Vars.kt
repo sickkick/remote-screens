@@ -33,6 +33,8 @@ object Vars {
     /** Camera card: spinner while HLS starts; still when the stream never comes. */
     const val KEY_CAM_WAITING = "cam_waiting"
     const val KEY_CAM_STILL = "cam_still"
+    /** Named bitmap for a map-marker photo: `map.pic.<entityId>`. */
+    const val MAP_PIC_PREFIX = "map.pic."
 
     fun entity(entityId: String, key: String) = "e.$entityId.$key"
     fun tile(tileId: String, key: String) = "t.$tileId.$key"

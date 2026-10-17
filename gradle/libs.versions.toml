@@ -24,6 +24,8 @@ mockito = "5.24.0"
 mockitoKotlin = "6.4.0"
 cameraX = "1.5.2"
 mlkitFaceDetection = "16.1.7"
+osm = "6.1.20"
+osmCompose = "0.0.5"
 compileSdk = "37"
 targetSdk = "37"
 minSdk = "26"
@@ -82,6 +84,8 @@ camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraX" 
 camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraX" }
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraX" }
 mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFaceDetection" }
+osm-android = { module = "org.osmdroid:osmdroid-android", version.ref = "osm" }
+osm-compose = { module = "tech.utsmankece:osm-android-compose", version.ref = "osmCompose" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
 

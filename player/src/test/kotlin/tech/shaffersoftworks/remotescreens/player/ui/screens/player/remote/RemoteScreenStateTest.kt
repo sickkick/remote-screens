@@ -212,4 +212,43 @@ class RemoteScreenStateTest {
             state.withVideo(Slot.OVERLAY, restarted).withoutVideo(Slot.OVERLAY, stopped).playingVideo,
         )
     }
+
+    private fun map(rev: Int) = SlotMap(
+        revision = rev,
+        componentId = 0x5D_0000,
+        tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        dark = true,
+        markers = emptyList(),
+    )
+
+    @Test
+    fun `a card's map plays`() {
+        val state = RemoteScreenState()
+            .withDocument(overlay(Slot.OVERLAY, rev = 2), documentBytes)
+            .withMap(Slot.OVERLAY, map(rev = 2))
+
+        assertEquals(Slot.OVERLAY to map(rev = 2), state.playingMap)
+    }
+
+    @Test
+    fun `a new document or closing the card ends its map`() {
+        val playing = RemoteScreenState()
+            .withDocument(overlay(Slot.OVERLAY, rev = 2), documentBytes)
+            .withMap(Slot.OVERLAY, map(rev = 2))
+
+        assertTrue(playing.withDocument(overlay(Slot.OVERLAY, rev = 4), documentBytes).maps.isEmpty())
+        assertTrue(playing.closed(Slot.OVERLAY).maps.isEmpty())
+        assertTrue(playing.cleared().maps.isEmpty())
+    }
+
+    @Test
+    fun `an alert over a map card hides the map until it closes`() {
+        val state = RemoteScreenState()
+            .withDocument(overlay(Slot.OVERLAY, rev = 2), documentBytes)
+            .withMap(Slot.OVERLAY, map(rev = 2))
+            .withDocument(overlay(Slot.ALERT, rev = 3), documentBytes)
+
+        assertNull(state.playingMap)
+        assertEquals(Slot.OVERLAY to map(rev = 2), state.closed(Slot.ALERT).playingMap)
+    }
 }

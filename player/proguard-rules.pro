@@ -16,6 +16,10 @@
 }
 -keep class androidx.compose.remote.** { *; }
 
+# osmdroid (interactive map cards)
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**
+
 # ML Kit (face wake): ComponentRegistrars are loaded by reflection. firebase-components:16.1.0
 # (pulled by face-detection) only keeps the class, not <init>(), and AGP 9 R8 full mode strips
 # no-arg constructors — FaceDetection.getClient() then NPEs on a null zzc.

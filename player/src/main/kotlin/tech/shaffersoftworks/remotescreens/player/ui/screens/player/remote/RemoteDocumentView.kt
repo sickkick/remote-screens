@@ -37,7 +37,9 @@ class RemoteDocumentView(context: Context) : SwipeFrame(context) {
     private var appliedBitmaps: Map<String, Bitmap> = emptyMap()
     private var appliedPage: Int? = null
     private val liveVideoView = LiveVideoView(context)
+    private val liveMapView = LiveMapView(context)
     private var videoSlot: Slot? = null
+    private var mapSlot: Slot? = null
     private var lastState: RemoteScreenState? = null
     private var appliedTimeZone: String? = null
 
@@ -67,17 +69,22 @@ class RemoteDocumentView(context: Context) : SwipeFrame(context) {
         viewTreeObserver.addOnPreDrawListener {
             for (slot in loadedDocuments.keys) fullLayoutIfDirty(players.getValue(slot))
             placeVideo()
+            placeMap()
             true
         }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        lastState?.let(::renderVideo)
+        lastState?.let { state ->
+            renderVideo(state)
+            renderMap(state)
+        }
     }
 
     override fun onDetachedFromWindow() {
         stopVideo()
+        stopMap()
         super.onDetachedFromWindow()
     }
 
@@ -110,6 +117,7 @@ class RemoteDocumentView(context: Context) : SwipeFrame(context) {
         // A value set from outside a touch is not drawn until the player is asked to.
         for (slot in loadedDocuments.keys) players.getValue(slot).invalidate()
         renderVideo(state)
+        renderMap(state)
     }
 
     private fun renderVideo(state: RemoteScreenState) {
@@ -141,15 +149,50 @@ class RemoteDocumentView(context: Context) : SwipeFrame(context) {
 
     /** Over the image the video belongs to, wherever the document laid it out, scrolled, this frame. */
     private fun placeVideo() {
-        val slot = videoSlot ?: return
+        placeOverlayView(videoSlot, liveVideoView, liveVideoView.video?.componentId)
+    }
+
+    private fun renderMap(state: RemoteScreenState) {
+        val activeMap = state.playingMap?.takeIf { windowVisibility == View.VISIBLE }
+        when {
+            activeMap == null -> stopMap()
+            activeMap.first != mapSlot || activeMap.second != liveMapView.map ->
+                startMap(activeMap.first, activeMap.second, state.bitmaps)
+            else -> liveMapView.show(activeMap.second, state.bitmaps)
+        }
+    }
+
+    /** Just above its document player, so a card's map stays under an alert. */
+    private fun startMap(slot: Slot, map: SlotMap, bitmaps: Map<String, Bitmap>) {
+        (liveMapView.parent as? ViewGroup)?.removeView(liveMapView)
+        val layoutParams = LayoutParams(0, 0).apply { gravity = Gravity.TOP or Gravity.START }
+        addView(liveMapView, indexOfChild(players.getValue(slot)) + 1, layoutParams)
+        liveMapView.visibility = View.INVISIBLE
+        mapSlot = slot
+        liveMapView.show(map, bitmaps)
+        placeMap()
+    }
+
+    private fun stopMap() {
+        liveMapView.stop()
+        mapSlot = null
+        (liveMapView.parent as? ViewGroup)?.removeView(liveMapView)
+    }
+
+    private fun placeMap() {
+        placeOverlayView(mapSlot, liveMapView, liveMapView.map?.componentId)
+    }
+
+    private fun placeOverlayView(slot: Slot?, overlay: View, componentId: Int?) {
+        if (slot == null || componentId == null) return
         val player = players.getValue(slot)
-        val bounds = liveVideoView.video?.let { video -> componentBounds(player, video.componentId) }
+        val bounds = componentBounds(player, componentId)
         if (bounds == null) {
-            liveVideoView.visibility = View.INVISIBLE
+            overlay.visibility = View.INVISIBLE
             return
         }
         bounds.offset(player.left, player.top)
-        val layoutParams = liveVideoView.layoutParams as LayoutParams
+        val layoutParams = overlay.layoutParams as LayoutParams
         val previousBounds = Rect(
             layoutParams.leftMargin,
             layoutParams.topMargin,
@@ -161,9 +204,9 @@ class RemoteDocumentView(context: Context) : SwipeFrame(context) {
             layoutParams.topMargin = bounds.top
             layoutParams.width = bounds.width()
             layoutParams.height = bounds.height()
-            liveVideoView.layoutParams = layoutParams
+            overlay.layoutParams = layoutParams
         }
-        liveVideoView.visibility = View.VISIBLE
+        overlay.visibility = View.VISIBLE
     }
 
     /**

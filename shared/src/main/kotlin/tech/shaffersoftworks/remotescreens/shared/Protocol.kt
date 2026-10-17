@@ -19,6 +19,9 @@ object Protocol {
     /** A player that can play [ServerMessage.Video]. Only it is sent one, so no camera streams for one that can't. */
     const val CAPABILITY_VIDEO = "video"
 
+    /** A player that can show an interactive [ServerMessage.LiveMap] over a map card. Others get a still bitmap. */
+    const val CAPABILITY_MAP = "map"
+
     val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
@@ -212,6 +215,23 @@ sealed interface ServerMessage {
         val crop: Boolean,
     ) : ServerMessage
 
+    /**
+     * An interactive OpenStreetMap over the component with id [componentId] in document [rev] of [slot].
+     * [tileUrl] has `{z}`, `{x}` and `{y}` (the add-on's `map_tiles`). [markers] are people (or trackers) to pin.
+     * Only for players with [Protocol.CAPABILITY_MAP]; it ends when the document goes.
+     * Named [LiveMap] (not Map) so it does not clash with `kotlin.collections.Map` in this file.
+     */
+    @Serializable
+    @SerialName("map")
+    data class LiveMap(
+        val slot: Slot,
+        val rev: Int,
+        val componentId: Int,
+        val tileUrl: String,
+        val dark: Boolean,
+        val markers: List<MapMarker> = emptyList(),
+    ) : ServerMessage
+
     @Serializable
     @SerialName("settings")
     data class Settings(val settings: ScreenSettings) : ServerMessage
@@ -245,3 +265,12 @@ sealed interface ServerMessage {
     @SerialName("pong")
     data object Pong : ServerMessage
 }
+
+/** A pin on [ServerMessage.LiveMap]. [picture] is a named bitmap the add-on already sent, or null for initials. */
+@Serializable
+data class MapMarker(
+    val latitude: Double,
+    val longitude: Double,
+    val label: String,
+    val picture: String? = null,
+)
